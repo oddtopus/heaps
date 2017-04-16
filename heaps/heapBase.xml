@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<heap type="baseStuff">
+	<stuff category="things" where="">
+		<thing file="thing1.fcstd" name="thing1" >
+			One red cube. </thing>
+		<thing file="thing2.fcstd" name="thing2" >
+			One green cylinder. </thing>
+		<thing file="thing3.fcstd" name="thing3" >
+			One blue sphere. </thing>
+	</stuff>
+	<stuff category="otherThings" where="" >
+		<thing file="thing4.fcstd" name="thing4" >
+			One cyan cone. </thing>
+		<thing file="thing5.fcstd" name="thing5" >
+			One yellow ring. </thing>
+		<thing file="thing6.fcstd" name="thing6" >
+			One magenta fusion. </thing>
+	</stuff>
+</heap>
