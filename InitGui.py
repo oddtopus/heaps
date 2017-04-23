@@ -231,11 +231,10 @@ static char * image[] =
   ToolTip = "heapsOstuff workbench"
   def Initialize(self):
     import CommandsHeap
-    list1 = ["insertThing"]
-    #self.appendToolbar("heapsOstuff",list1)
     Log ('Loading heapsOstuff: done\n')
-    menu1 = ["Heaps of Stuff"]
-    self.appendMenu(menu1,list1)
+    list1=["mergeThing","heapsManager"]
+    self.appendToolbar('heapsOstuff',list1)
+    self.appendMenu(["Heaps of Stuff"],list1)
     pass
 
   def Activated(self):

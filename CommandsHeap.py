@@ -6,7 +6,7 @@ __url__="github.com/oddtopus/heaps"
 __license__="LGPL 3"
 
 # import FreeCAD modules
-import FreeCAD, FreeCADGui,inspect
+import FreeCAD, FreeCADGui,inspect, os
 
 # helper -------------------------------------------------------------------
 
@@ -25,18 +25,29 @@ def addCommand(name,cmdObject):
 # The command classes
 #---------------------------------------------------------------------------
 
-class insertThing:
+class mergeThing:
   '''
   Simple dialog to merge .fcstd files in documents.
   '''
   def Activated (self):
     import heaps
-    heapsForm=heaps.insertThingForm()
+    heapsForm=heaps.mergeThingForm()
   def GetResources(self):
-    return{'Pixmap':'Std_Tool1','MenuText':'Merge things','ToolTip':'Open heap, select stuff, pick thing.'}
+    return{'Pixmap':os.path.join(os.path.dirname(os.path.abspath(__file__)),"icons","merge.svg"),'MenuText':'Merge things','ToolTip':'Open heap -> select stuff -> merge thing.'}
+
+class heapsManager:
+  '''
+  Simple dialog to create heaps, add stuff to heaps 
+  or add things to stuff.
+  '''
+  def Activated (self):
+    import heaps
+    heapsForm=heaps.HeapsManagerForm()
+  def GetResources(self):
+    return{'Pixmap':os.path.join(os.path.dirname(os.path.abspath(__file__)),"icons","manager.svg"),'MenuText':'Heaps manager','ToolTip':'Actions on heaps'}
 
 #---------------------------------------------------------------------------
 # Adds the commands to the FreeCAD command manager
 #---------------------------------------------------------------------------
-addCommand('insertThing',insertThing())
-
+addCommand('mergeThing',mergeThing())
+addCommand('heapsManager',heapsManager())

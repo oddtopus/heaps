@@ -7,76 +7,99 @@ __license__="LGPL 3"
 
 import xml.etree.ElementTree as et
 from PySide.QtGui import QFileDialog as qfd
-from os import listdir
-from os.path import abspath,dirname,join
+from os import listdir,sep, environ
+from os.path import abspath,dirname,join,sep
 from PySide.QtGui import QInputDialog as inputs
 import FreeCAD, FreeCADGui
 
 ################# CLASSES ###################
 
 class heap():
-  '''heap(heapDir,heapFile)
+  '''heap(heapFile)
   \tThe heap object
-  \tDefault heapDir = "./heaps"
-  \tDefault heapFile = "heapBase.xml"'''
-  def __init__(self,heapDir=None,heapFile='heapBase.xml'):
-    if not heapDir:
-      heapDir=join(dirname(abspath(__file__)),'heaps')    
-    self.heapDir=heapDir
-    self.heapFile=heapFile
-    self.heapUpdate()
+  \tDefault heapFile = "../Mod/heaps/heaps/heapBase.xml"
+  \tIf the path is not specified in the argument, it is changed to
+  \t"../Mod/heaps/heaps/" by default'''
+  def __init__(self,heapFile='heapBase.xml'):
+    if dirname(heapFile):
+      self.heapFile=heapFile
+    else:
+      self.heapFile=join(dirname(abspath(__file__)),'heaps',heapFile)
+    self.heapRead()
   def heapWrite(self, fileName):
     '''heapWrite(fileName)
     \tWrites the .heap attribute to specified fileName'''
-    self.heap.write(join(self.heapDir,fileName))
-  def heapUpdate(self):
-    '''heapUpdate()
-    \tupdates the attribute .heap'''
-    self.heap=et.parse(join(self.heapDir,self.heapFile))
-  def getStuff(self):
-    '''getStuff()
-    \tReturns the list of stuff (list of Element) in the .heap (ElementTree)'''
-    return [s for s in self.heap.iter('stuff')]
+    self.heap.write(fileName)
+  def heapRead(self):
+    '''heapRead()
+    \tUpdates the attribute .heap re-parsing the .xml file'''
+    self.heap=et.parse(self.heapFile)
+  def getStuff(self,cat=None):
+    '''getStuff(cat)
+    \tReturns the list of stuff (list of Element) in the .heap (ElementTree)
+    \twhich category==cat'''
+    if cat:
+      return [s for s in self.heap.iter('stuff') if s.attrib['category']==cat]
+    else:
+      return [s for s in self.heap.iter('stuff')]
   def addStuff(self,cat='',where=''): #in progress
     '''Adds stuff to heap'''
-    cat=inputs.getText(None,'Add stuff','Insert new \ncategory')
-    if cat[1]:
-      et.SubElement(self.heap.getroot(),'stuff',category=cat[0],where='')
+    if not cat:
+      reply=inputs.getText(None,'Add stuff','Insert new \ncategory:')
+      if reply[1]:
+        cat=reply[0]
+      else:
+        return
+    et.SubElement(self.heap.getroot(),'stuff',category=cat,where='')
+    return cat
   def getThings(self,category):
     '''getThings(category)
     \tIf "category" is in the heap, returns the list of 
-    relevant things (list of Element)
+    \trelevant things (list of Element)
     '''
     things=list()
     for stuff in self.getStuff():
       if stuff.attrib['category']==category:
         things+=[t for t in stuff.iter('thing')  ]
     return things
-  def addThings(self,cat=None,thingFiles=[],names=[]): #in progress
-    '''Adds things to stuff'''
-    if len(thingFiles)!=len(names):
-      FreeCAD.Console.PrintError("Files and names lists don't match\n")
-      return 0
-    #temporary code: direct category input
-    if not cat:
-      cat=inputs.getItem(None,'Add things','Select the stuff of thing',[s.attrib['category'] for s in self.getStuff()])[0]
-    stuff=[s for s in self.heap.iter('stuff')][0]
-    thingFiles=qfd.getOpenFileNames()[0]
+  def addThings(self,cat=None): #in progress
+    '''Adds things to stuff.
+    Returns names list of things'''
+    #if not cat: #temporary code: direct category input
+    #  cat=inputs.getItem(None,'Add things','Select the stuff of thing',[s.attrib['category'] for s in self.getStuff()])[0]
+    stuff=self.getStuff(cat)[0]
+    home=''
+    try:
+      home=environ['HOME']
+    except:
+      pass
+    thingFiles=qfd.getOpenFileNames(dir=home,filter='FC models (*.fcstd)')[0]
+    names=list()
+    where=stuff.attrib['where']
+    if not where:
+      if self.getThings(cat): 
+        where=join(dirname(abspath(__file__)),'heaps')
+      else: 
+        where=dirname(thingFiles[0])
+        stuff.attrib['where']=where
     for thingFile in thingFiles:
-      #temporary code: preliminary check
-      if dirname(abspath(thingFile))==stuff.attrib['where']:
-        FreeCAD.Console.PrintMessage(thingFile+' can be added to stuff '+stuff.attrib['category']+'.\n')
+      if dirname(abspath(thingFile))==where:
+        thingName=thingFile.split(sep)[-1].split('.')[-2]
+        names.append(thingName)
+        newThing=et.SubElement(stuff,'thing',name=thingName,file=thingName+'.fcstd')
+        newThing.text='-- Add description here --'
+        FreeCAD.Console.PrintMessage('"'+thingName+'" added to stuff "'+stuff.attrib['category']+'".\n')
       else:
-        FreeCAD.Console.PrintError(thingFile+' is outside '+stuff.attrib['where']+'.\n')
-    return len(thingFiles)
+        FreeCAD.Console.PrintError(thingFile+' is not inside directory '+where+'.\n')
+        break
+    return names
 
 ################# COMMANDS ##################
 
-def generateHeap(fileName='heapBase.xml',heapDir=None):
-  '''generateHeap(fileName='heapBase.xml',heapDir=None)   
-  Generates a sample heap'''
-  if not heapDir:
-    heapDir=join(dirname(abspath(__file__)),'heaps') #'[..]/.FreeCAD/Mod/heapsOstuff/heaps/'
+def generateHeap(fileName='heapBase.xml'):
+  '''generateHeap(fileName='heapBase.xml')   
+  Generates a sample heap in "../Mod/heaps/heaps/"'''
+  heapDir=join(dirname(abspath(__file__)),'heaps') #'[..]/.FreeCAD/Mod/heapsOstuff/heaps/'
   heapEl=et.Element('heap',type='baseStuff')
   stuff1=et.Element('stuff',category='things1',where='/home/path/number/1')
   stuff2=et.Element('stuff',category='otherThings',where='/home/path/number/2')
@@ -97,7 +120,7 @@ def importAndMove(fileToMerge='',pos=FreeCAD.Vector(0,0,0)):
   \tIf no file is specified, uses getOpenFileName()'''
   n=len(FreeCAD.ActiveDocument.Objects)
   if not fileToMerge:
-    from os import environ
+    #from os import environ
     home=''
     try:
       home=environ['HOME']
@@ -120,6 +143,15 @@ def edges():
   except:
     FreeCAD.Console.PrintError('\nNo valid selection.\n')
   return eds
+
+def faces(selex=[]):
+  '''returns the list of faces in the selection set'''
+  selex=FreeCADGui.Selection.getSelectionEx()
+  try:
+    fcs=[f for sx in selex for so in sx.SubObjects for f in so.Faces]
+  except:
+    FreeCAD.Console.PrintError('\nNo valid selection.\n')
+  return fcs
 
 ################# FORMS #####################
 
@@ -151,8 +183,9 @@ class prototypeHeapForm(QWidget):
       from PySide.QtGui import QIcon
       Icon=QIcon()
       Icon.addFile(iconPath)
-      self.setWindowIcon(Icon) 
-    self.currentHeapLab=QLabel('Heap: %s' %self.heap.heapFile.rstrip('.xml'))
+      self.setWindowIcon(Icon)
+    self.currentHeapLab=QLabel()
+    self.currentDirLab=QLabel('Place: (directory of stuff)')
     self.thingsList=QListWidget()
     self.thingsList.itemClicked.connect(self.changeThing)
     self.stuffList=QListWidget()
@@ -166,11 +199,12 @@ class prototypeHeapForm(QWidget):
     self.grid=QGridLayout()
     self.setLayout(self.grid)
     self.grid.addWidget(self.currentHeapLab,0,0,1,2)
-    self.grid.addWidget(self.stuffList,1,0)
-    self.grid.addWidget(self.thingsList,1,1)
-    self.grid.addWidget(self.btn1,2,0)
-    self.grid.addWidget(self.btn2,2,1)
-    self.grid.addWidget(self.text,3,0,1,2)
+    self.grid.addWidget(self.currentDirLab,1,0,1,2)
+    self.grid.addWidget(self.stuffList,2,0)
+    self.grid.addWidget(self.thingsList,2,1)
+    self.grid.addWidget(self.btn1,3,0)
+    self.grid.addWidget(self.btn2,3,1)
+    self.grid.addWidget(self.text,4,0,1,2)
     self.show()
   def openHeap(self, heap2open=None):
     if not heap2open:
@@ -182,6 +216,7 @@ class prototypeHeapForm(QWidget):
         del reply
         return
     self.heap=heap(heapFile=heap2open)
+    self.currentHeapLab.setText('Heap: %s' %self.heap.heapFile.split(sep)[-1])
     self.stuff.clear()
     self.things.clear()
     self.text.clear()
@@ -193,8 +228,15 @@ class prototypeHeapForm(QWidget):
   def changeStuff(self):
     self.currentStuff=self.stuffList.currentItem().text()
     self.things.clear()
+    place=self.stuff[self.currentStuff]
+    if not place: place='(default or not defined)'
+    elif len(place)>30: place=".."+place[-28:]
+    self.currentDirLab.setText('Place: %s' %place)
     for thing in self.heap.getThings(self.currentStuff):
-      self.things[thing.attrib['name']]=[thing.attrib['file'],thing.text.strip()+'\n'+thing.tail.strip()]
+      description=''
+      if thing.text: description+=thing.text.strip()
+      if thing.tail: description+='\n'+thing.tail.strip()
+      self.things[thing.attrib['name']]=[thing.attrib['file'],description]
     self.thingsList.clear()
     things=self.things.keys()
     things.sort()
@@ -203,32 +245,35 @@ class prototypeHeapForm(QWidget):
     self.currentThing=self.thingsList.currentItem().text()
     self.text.setText(self.things[self.currentThing][1])
     
-class insertThingForm(prototypeHeapForm):
+class mergeThingForm(prototypeHeapForm):
   '''Form to merge a model from one heap into the ActiveDocument
   '''
   def __init__(self,winTitle='Merge a thing', startHeap='heapBase.xml', icon=''):
     # Widgets
-    super(insertThingForm,self).__init__(winTitle,startHeap,icon)
-    self.btn1.setText('Insert thing')
+    super(mergeThingForm,self).__init__(winTitle,startHeap,icon)
+    self.btn1.setText('Merge thing')
     self.btn1.clicked.connect(self.insertThing)
     self.btn2.setText('Open heap')
     self.btn2.clicked.connect(self.openHeap)
   def insertThing(self):
     if FreeCAD.ActiveDocument:
+      directory=''
       if self.currentStuff:
         directory=self.stuff[self.currentStuff]
       else:
         FreeCAD.Console.PrintError('Select somestuff before.\n')
         return
       if not directory:
-        directory=self.heap.heapDir
+        directory=dirname(self.heap.heapFile)
       if self.currentThing: #main block
         FreeCAD.ActiveDocument.openTransaction('Merge a file')
         file2merge=join(directory,self.things[self.thingsList.currentItem().text()][0])
         positions=list()
         selex=FreeCADGui.Selection.getSelectionEx()
         if selex:
-          if edges():
+          if faces():
+            positions=[face.CenterOfMass for face in faces()]
+          elif edges():
             positions=[edge.centerOfCurvatureAt(0) for edge in edges() if edge.curvatureAt(0)]
           else:
             subobjects=[so for sx in selex for so in sx.SubObjects]
@@ -237,6 +282,7 @@ class insertThingForm(prototypeHeapForm):
           for pos in positions:
             importAndMove(file2merge,pos)
         else:
+          FreeCAD.Console.PrintMessage(file2merge+'\n')
           importAndMove(file2merge)
         FreeCAD.ActiveDocument.commitTransaction()
         FreeCAD.ActiveDocument.recompute()
@@ -244,3 +290,32 @@ class insertThingForm(prototypeHeapForm):
         FreeCAD.Console.PrintError('Select something before.\n')
     else:
       FreeCAD.Console.PrintError('Open one file before.\n')
+
+class HeapsManagerForm(prototypeHeapForm):
+  '''Form to manage the heaps
+  '''
+  def __init__(self,winTitle='Heaps Manager', startHeap='heapBase.xml', icon=''):
+    # Widgets
+    super(HeapsManagerForm,self).__init__(winTitle,startHeap,icon)
+    self.btn1.setText('Add stuff')
+    self.btn1.clicked.connect(self.moreStuff)#(lambda: self.heap.addStuff())
+    self.btn2.setText('Open heap')
+    self.btn2.clicked.connect(self.openHeap)
+    self.grid.addWidget(self.text,5,0,2,2)
+    self.btn3=QPushButton('Add things')
+    self.btn3.clicked.connect(self.moreThings)
+    self.btn4=QPushButton('Create heap')
+    self.grid.addWidget(self.btn3,4,0)
+    self.grid.addWidget(self.btn4,4,1)
+  def moreStuff(self):
+    self.stuffList.addItem(self.heap.addStuff())
+    self.heap.heapWrite(self.heap.heapFile)
+  def moreThings(self):
+    if self.stuffList.selectedItems():
+      newThings=self.heap.addThings(self.currentStuff) # names' list
+      for thingName in newThings:
+        self.things[thingName]=[thingName+'.fcstd','-- Add description here --'] #add new things to the dictionary
+      self.thingsList.addItems(newThings) #add new things to the list-box
+      self.heap.heapWrite(self.heap.heapFile)
+      self.heap.heapRead()
+    
