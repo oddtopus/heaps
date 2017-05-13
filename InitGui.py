@@ -238,9 +238,14 @@ static char * image[] =
     pass
 
   def Activated(self):
+    import FreeCAD, FreeCADGui, heaps
+    FreeCAD.__activeHeap__=heaps.heap()
+    Msg('Created variable in FreeCAD module:\n__activeHeap__\n')
     return
 
   def Deactivated(self):
+    del FreeCAD.__activeHeap__
+    Msg('Deleted variable in FreeCAD module:\n__activeHeap__\n')
     return
 
 Gui.addWorkbench(heapsOstuffWorkbench)

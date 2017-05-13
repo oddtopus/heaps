@@ -6,15 +6,15 @@ __url__="github.com/oddtopus/heaps"
 __license__="LGPL 3"
 
 import xml.etree.ElementTree as et
-from PySide.QtGui import QFileDialog as qfd
+from PySide.QtGui import *
+from PySide.QtCore import *
 from os import listdir,sep, environ
 from os.path import abspath,dirname,join,sep
-from PySide.QtGui import QInputDialog as inputs
 import FreeCAD, FreeCADGui
 
 ################# CLASSES ###################
 
-class heap():
+class heap(object):
   '''heap(heapFile)
   \tThe heap object
   \tDefault heapFile = "../Mod/heaps/heaps/heapBase.xml"
@@ -45,7 +45,7 @@ class heap():
   def addStuff(self,cat='',where=''): #in progress
     '''Adds stuff to heap'''
     if not cat:
-      reply=inputs.getText(None,'Add stuff','Insert new \ncategory:')
+      reply=QInputDialog.getText(None,'Add stuff','Insert new \ncategory:')
       if reply[1]:
         cat=reply[0]
       else:
@@ -66,14 +66,14 @@ class heap():
     '''Adds things to stuff.
     Returns names list of things'''
     #if not cat: #temporary code: direct category input
-    #  cat=inputs.getItem(None,'Add things','Select the stuff of thing',[s.attrib['category'] for s in self.getStuff()])[0]
+    #  cat=QInputDialog.getItem(None,'Add things','Select the stuff of thing',[s.attrib['category'] for s in self.getStuff()])[0]
     stuff=self.getStuff(cat)[0]
     home=''
     try:
       home=environ['HOME']
     except:
       pass
-    thingFiles=qfd.getOpenFileNames(dir=home,filter='FC models (*.fcstd)')[0]
+    thingFiles=QFileDialog.getOpenFileNames(dir=home,filter='FC models (*.fcstd)')[0]
     names=list()
     where=stuff.attrib['where']
     if not where:
@@ -126,7 +126,7 @@ def importAndMove(fileToMerge='',pos=FreeCAD.Vector(0,0,0)):
       home=environ['HOME']
     except:
       pass
-    fileToMerge=qfd.getOpenFileName(dir=home,filter='FC models (*.fcstd)')[0]
+    fileToMerge=QFileDialog.getOpenFileName(dir=home,filter='FC models (*.fcstd)')[0]
   if fileToMerge:
     FreeCADGui.ActiveDocument.mergeProject(fileToMerge)
     l=[o.Name for o in FreeCAD.ActiveDocument.Objects[n:]]
@@ -155,24 +155,21 @@ def faces(selex=[]):
 
 ################# FORMS #####################
 
-from PySide.QtCore import *
-from PySide.QtGui import *
-
 class prototypeHeapForm(QWidget):
   def __init__(self,winTitle='Title', startHeap='heapBase.xml', icon=''):
     '''
     __init__(self, winTitle='Title', startHeap='heapBase.xml', icon='')
        
     '''
+    super(prototypeHeapForm,self).__init__()
     # Main properties
-    self.heap=heap(heapFile=startHeap)
+    FreeCAD.__activeHeap__=heap(heapFile=startHeap)
     self.currentStuff=''
     self.currentThing=''
     self.stuff=dict() 
     self.things=dict()
     w=140
     # Widgets
-    super(prototypeHeapForm,self).__init__()
     self.move(QPoint(100,250))
     self.setWindowFlags(Qt.WindowStaysOnTopHint)
     self.setWindowTitle(winTitle)
@@ -180,7 +177,6 @@ class prototypeHeapForm(QWidget):
     self.setMaximumHeight(3*w)
     if icon:
       iconPath=join(dirname(abspath(__file__)),"icons",icon)
-      from PySide.QtGui import QIcon
       Icon=QIcon()
       Icon.addFile(iconPath)
       self.setWindowIcon(Icon)
@@ -208,21 +204,21 @@ class prototypeHeapForm(QWidget):
     self.show()
   def openHeap(self, heap2open=None):
     if not heap2open:
-      reply=qfd.getOpenFileName(self,dir=join(dirname(abspath(__file__)),"heaps"),filter='Heap file (*.xml)')
+      reply=QFileDialog.getOpenFileName(self,dir=join(dirname(abspath(__file__)),"heaps"),filter='Heap file (*.xml)')
       if reply[1]:
         heap2open=reply[0]
         del reply
       else:
         del reply
         return
-    self.heap=heap(heapFile=heap2open)
-    self.currentHeapLab.setText('Heap: %s' %self.heap.heapFile.split(sep)[-1])
+    FreeCAD.__activeHeap__=heap(heapFile=heap2open)
+    self.currentHeapLab.setText('Heap: %s' %FreeCAD.__activeHeap__.heapFile.split(sep)[-1])
     self.stuff.clear()
     self.things.clear()
     self.text.clear()
     self.thingsList.clear()
     self.stuffList.clear()
-    for s in self.heap.getStuff():
+    for s in FreeCAD.__activeHeap__.getStuff():
       self.stuff[s.attrib['category']]=s.attrib['where']
     self.stuffList.addItems(self.stuff.keys())
   def changeStuff(self):
@@ -232,7 +228,7 @@ class prototypeHeapForm(QWidget):
     if not place: place='(default or not defined)'
     elif len(place)>30: place=".."+place[-28:]
     self.currentDirLab.setText('Place: %s' %place)
-    for thing in self.heap.getThings(self.currentStuff):
+    for thing in FreeCAD.__activeHeap__.getThings(self.currentStuff):
       description=''
       if thing.text: description+=thing.text.strip()
       if thing.tail: description+='\n'+thing.tail.strip()
@@ -245,17 +241,64 @@ class prototypeHeapForm(QWidget):
     self.currentThing=self.thingsList.currentItem().text()
     self.text.setText(self.things[self.currentThing][1])
     
-class mergeThingForm(prototypeHeapForm):
+class mergeThingForm:#(prototypeHeapForm):
   '''Form to merge a model from one heap into the ActiveDocument
   '''
   def __init__(self,winTitle='Merge a thing', startHeap='heapBase.xml', icon=''):
+    # Main properties
+    FreeCAD.__activeHeap__=heap(heapFile=startHeap)
+    self.currentStuff=''
+    self.currentThing=''
+    self.stuff=dict() 
+    self.things=dict()
     # Widgets
-    super(mergeThingForm,self).__init__(winTitle,startHeap,icon)
-    self.btn1.setText('Merge thing')
-    self.btn1.clicked.connect(self.insertThing)
-    self.btn2.setText('Open heap')
-    self.btn2.clicked.connect(self.openHeap)
-  def insertThing(self):
+    self.form=FreeCADGui.PySideUic.loadUi(join(dirname(abspath(__file__)),"dialogs","merge.ui"))
+    #super(mergeThingForm,self).__init__(winTitle,startHeap,icon)
+    #self.btn1.setText('Merge thing')
+    #self.btn1.clicked.connect(self.insertThing)
+    #self.btn2.setText('Open heap')
+    self.form.btn2.clicked.connect(self.openHeap)
+    self.form.stuffCombo.currentIndexChanged.connect(self.changeStuff)
+    self.form.thingsList.itemClicked.connect(self.changeThing)
+    self.openHeap(join(dirname(abspath(__file__)),"heaps","heapBase.xml"))
+  def changeStuff(self):
+    self.currentStuff=self.form.stuffCombo.currentText()
+    self.things.clear()
+    #place=self.stuff[self.currentStuff]
+    #print place
+    #if not place: place='(default or not defined)'
+    #elif len(place)>30: place=".."+place[-28:]
+    for thing in FreeCAD.__activeHeap__.getThings(self.currentStuff):
+      description=''
+      if thing.text: description+=thing.text.strip()
+      if thing.tail: description+='\n'+thing.tail.strip()
+      self.things[thing.attrib['name']]=[thing.attrib['file'],description]
+    self.form.thingsList.clear()
+    things=self.things.keys()
+    things.sort()
+    self.form.thingsList.addItems(things)
+  def changeThing(self):
+    self.currentThing=self.form.thingsList.currentItem().text()
+    self.form.text.setText(self.things[self.currentThing][1])
+  def openHeap(self, heap2open=None):
+    if not heap2open:
+      reply=QFileDialog.getOpenFileName(dir=join(dirname(abspath(__file__)),"heaps"),filter='Heap file (*.xml)')
+      if reply[1]:
+        heap2open=reply[0]
+        del reply
+      else:
+        del reply
+        return
+    FreeCAD.__activeHeap__=heap(heapFile=heap2open)
+    self.stuff.clear()
+    self.things.clear()
+    self.form.text.clear()
+    self.form.thingsList.clear()
+    self.form.stuffCombo.clear()
+    for s in FreeCAD.__activeHeap__.getStuff():
+      self.stuff[s.attrib['category']]=s.attrib['where']
+    self.form.stuffCombo.addItems(self.stuff.keys())
+  def accept(self):#insertThing(self):
     if FreeCAD.ActiveDocument:
       directory=''
       if self.currentStuff:
@@ -264,10 +307,10 @@ class mergeThingForm(prototypeHeapForm):
         FreeCAD.Console.PrintError('Select somestuff before.\n')
         return
       if not directory:
-        directory=dirname(self.heap.heapFile)
+        directory=dirname(FreeCAD.__activeHeap__.heapFile)
       if self.currentThing: #main block
         FreeCAD.ActiveDocument.openTransaction('Merge a file')
-        file2merge=join(directory,self.things[self.thingsList.currentItem().text()][0])
+        file2merge=join(directory,self.things[self.form.thingsList.currentItem().text()][0])
         positions=list()
         selex=FreeCADGui.Selection.getSelectionEx()
         if selex:
@@ -298,7 +341,7 @@ class HeapsManagerForm(prototypeHeapForm):
     # Widgets
     super(HeapsManagerForm,self).__init__(winTitle,startHeap,icon)
     self.btn1.setText('Add stuff')
-    self.btn1.clicked.connect(self.moreStuff)#(lambda: self.heap.addStuff())
+    self.btn1.clicked.connect(self.moreStuff)#(lambda: FreeCAD.__activeHeap__.addStuff())
     self.btn2.setText('Open heap')
     self.btn2.clicked.connect(self.openHeap)
     self.grid.addWidget(self.text,5,0,2,2)
@@ -308,14 +351,14 @@ class HeapsManagerForm(prototypeHeapForm):
     self.grid.addWidget(self.btn3,4,0)
     self.grid.addWidget(self.btn4,4,1)
   def moreStuff(self):
-    self.stuffList.addItem(self.heap.addStuff())
-    self.heap.heapWrite(self.heap.heapFile)
+    self.stuffList.addItem(FreeCAD.__activeHeap__.addStuff())
+    FreeCAD.__activeHeap__.heapWrite(FreeCAD.__activeHeap__.heapFile)
   def moreThings(self):
     if self.stuffList.selectedItems():
-      newThings=self.heap.addThings(self.currentStuff) # names' list
+      newThings=FreeCAD.__activeHeap__.addThings(self.currentStuff) # names' list
       for thingName in newThings:
         self.things[thingName]=[thingName+'.fcstd','-- Add description here --'] #add new things to the dictionary
       self.thingsList.addItems(newThings) #add new things to the list-box
-      self.heap.heapWrite(self.heap.heapFile)
-      self.heap.heapRead()
+      FreeCAD.__activeHeap__.heapWrite(FreeCAD.__activeHeap__.heapFile)
+      FreeCAD.__activeHeap__.heapRead()
     

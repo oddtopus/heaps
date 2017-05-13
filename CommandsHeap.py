@@ -31,7 +31,8 @@ class mergeThing:
   '''
   def Activated (self):
     import heaps
-    heapsForm=heaps.mergeThingForm()
+    #heapsForm=heaps.mergeThingForm()
+    FreeCADGui.Control.showDialog(heaps.mergeThingForm())
   def GetResources(self):
     return{'Pixmap':os.path.join(os.path.dirname(os.path.abspath(__file__)),"icons","merge.svg"),'MenuText':'Merge things','ToolTip':'Open heap -> select stuff -> merge thing.'}
 
